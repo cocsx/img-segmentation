@@ -9,11 +9,15 @@ struct Image
     uint8_t* data;
     int size;
     int width, height, channels;
+    uint8_t* get_pixel_offset(int i, int j) 
+    {
+        return data + (j + height * i) * channels;
+    }
 };
 
-void get_data_from_file(Image* img, const char* file_path) {
+void get_data_from_file(Image* img, const char* file_path) 
+{
     int width, height, channels;
-    // stbi_set_flip_vertically_on_load(1);
     int ok = stbi_info(file_path, &width, &height, &channels);
     if (!ok) 
     {
@@ -37,10 +41,10 @@ void write_ppm_file(Image* img, const char* file_path)
     {
         for (int j = 0; j < img->height; j++)
         {
-            uint8_t* offset = img->data + (j + img->height* i) * img->channels;
-            uint8_t r = offset[0];
-            uint8_t g = offset[1];
-            uint8_t b = offset[2];
+            uint8_t* o = img->get_pixel_offset(i, j);
+            uint8_t r = o[0];
+            uint8_t g = o[1];
+            uint8_t b = o[2];
             f << (int) r << " " << (int) g << " "  << (int) b << std::endl;
         }
     }
@@ -48,11 +52,26 @@ void write_ppm_file(Image* img, const char* file_path)
     f.close();
 }
 
+void grayscale(Image* img)
+{
+    for (int i = 0; i <= img->width; i++)
+    {
+        for (int j = 0; j <= img->height; j++)
+        {
+            uint8_t* o = img->get_pixel_offset(i, j);
+            //                         r      g      b
+            uint32_t c = (uint32_t) (o[0] + o[1] + o[2]) / 3;
+            o[0] = c; o[1] = c; o[2] = c;
+        }
+    }
+}
+
 int main()
 {
     Image img;
     get_data_from_file(&img, "parrot.jpg");
     
+    grayscale(&img);
     write_ppm_file(&img, "parrot.ppm");
 
     stbi_image_free(img.data);
