@@ -1,0 +1,6 @@
+*/*.o
+bin/
+
+*.ppm
+*.png
+*.jpg
