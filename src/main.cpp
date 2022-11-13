@@ -80,8 +80,8 @@ Image* loadImage(const char* filePath)
     {
         for (int y = 0; y < img->height; y++)
         {
-            int offset = (x*img->height + y) * img->comps;
-            img->pixels[x*img->height + y] = (data[offset] << 24) + (data[offset + 1] << 16) + (data[offset + 2] << 8) + 0xFF;
+            int offset = (x + img->width*y) * img->comps;
+            img->pixels[x + img->width*y] = (data[offset] << 24) + (data[offset + 1] << 16) + (data[offset + 2] << 8) + 0xFF;
             //printf("[r: %x, g: %x, b: %x] => %x \n", data[offset], data[offset+1], data[offset+2], img->pixels[x * img->height + y]);
         } 
     }
@@ -95,9 +95,9 @@ void makeGray(Image* img, SDL_Renderer* renderer, SDL_Texture* texture)
     {
         for (int y = 0; y < img->height; y++)
         {
-            uint32_t u32 = img->pixels[x*img->height + y];
+            uint32_t u32 = img->pixels[x + img->width*y];
             uint8_t g = (((u32 & 0xff000000) >> 24) + ((u32 & 0x00ff0000) >> 16) + ((u32 & 0x0000ff00) >> 8)) / 3;
-            img->pixels[x*img->height + y] = (g << 24) + (g << 16) + (g << 8) + 0xFF;
+            img->pixels[x + img->width*y] = (g << 24) + (g << 16) + (g << 8) + 0xFF;
         }
         img->updateTextureDisplay(renderer, texture);
     }   
@@ -128,7 +128,7 @@ void makeClusters(Image* img, int numOfClusters, int maxIter, SDL_Renderer* rend
                 int min_dist = INT_MAX;
                 for (auto c : clusters)
                 {
-                    int dist = pow(c[0] - x, 2) + pow(c[1] - y, 2); 
+                    int dist = (c[0] - x)*(c[0] - x) + (c[1] - y)*(c[1] - y); 
                     if (dist >= min_dist) continue;
                     min_dist = dist;
                     i = c[0];
@@ -162,7 +162,7 @@ void makeClusters(Image* img, int numOfClusters, int maxIter, SDL_Renderer* rend
     {
         for (auto p : cp.second)
         {
-            img->pixels[p.x*img->height + p.y] = img->pixels[cp.first.x*img->height + cp.first.y];
+            img->pixels[p.x + img->width*p.y] = img->pixels[cp.first.x + img->width*cp.first.y];
         }
         img->updateTextureDisplay(renderer, texture);                
     }
@@ -170,7 +170,7 @@ void makeClusters(Image* img, int numOfClusters, int maxIter, SDL_Renderer* rend
 
 int main()
 {
-    const char filePath[] = "parrot.jpg";
+    const char filePath[] = "dog.jpg";
     Image* img = loadImage(filePath);
     
     assert(SDL_Init(SDL_INIT_VIDEO) == 0);
@@ -182,7 +182,7 @@ int main()
     bool done = false;
     
     int numOfClusters = 3000;
-    int numOfIterations = 30;
+    int numOfIterations = 20;
     while (SDL_PollEvent(&event) || !done)
     {
         switch (event.type)

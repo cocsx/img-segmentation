@@ -5,4 +5,5 @@ bin/
 *.png
 *.jpg
 
-!duck.jpg
+!parrot.jpg
+!dog.jpg
