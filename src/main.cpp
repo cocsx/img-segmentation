@@ -26,15 +26,19 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "../vendor/stb/stb_image_write.h"
 
+struct __attribute__ ((packed)) Pixel {
+    uint8_t r, g, b, a;
+};
+
 struct Image 
 {
     int width, height, comps;
-    int stride;
-    uint32_t* pixels;
+    int pitch;
+    Pixel* pixels;
     
     void updateTextureDisplay(SDL_Renderer* renderer, SDL_Texture* texture)
     {
-        SDL_UpdateTexture(texture, nullptr, (void*)pixels, stride);
+        SDL_UpdateTexture(texture, nullptr, (void*)pixels, pitch);
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, texture, NULL, NULL);
         SDL_RenderPresent(renderer);
@@ -73,15 +77,15 @@ Image* loadImage(const char* filePath)
 {
     Image* img = new Image;
     uint8_t* data = stbi_load(filePath, &img->width, &img->height, &img->comps, STBI_rgb);
-    img->stride = img->width * sizeof(uint32_t);
-    img->pixels = new uint32_t[img->width * img->height];
+    img->pitch = img->width * sizeof(Pixel);
+    img->pixels = new Pixel[img->width * img->height];
     
     for (int x = 0; x < img->width; x++)
     {
         for (int y = 0; y < img->height; y++)
         {
             int offset = (x + img->width*y) * img->comps;
-            img->pixels[x + img->width*y] = (data[offset] << 24) + (data[offset + 1] << 16) + (data[offset + 2] << 8) + 0xFF;
+            img->pixels[x + img->width*y] = {data[offset], data[offset+1], data[offset+2], 0xff};
             //printf("[r: %x, g: %x, b: %x] => %x \n", data[offset], data[offset+1], data[offset+2], img->pixels[x * img->height + y]);
         } 
     }
@@ -95,12 +99,17 @@ void makeGray(Image* img, SDL_Renderer* renderer, SDL_Texture* texture)
     {
         for (int y = 0; y < img->height; y++)
         {
-            uint32_t u32 = img->pixels[x + img->width*y];
-            uint8_t g = (((u32 & 0xff000000) >> 24) + ((u32 & 0x00ff0000) >> 16) + ((u32 & 0x0000ff00) >> 8)) / 3;
-            img->pixels[x + img->width*y] = (g << 24) + (g << 16) + (g << 8) + 0xFF;
+            Pixel p = img->pixels[x + img->width*y];
+            uint8_t g = (p.r + p.g + p.b) / 3;
+            img->pixels[x + img->width*y] = {g, g, g, 0xff};
         }
         img->updateTextureDisplay(renderer, texture);
     }   
+}
+
+int distanceBetweenTwoColors(Pixel p1, Pixel p2)
+{
+    return (p1.r-p2.r)*(p1.r-p2.r) + (p1.g-p2.g)*(p1.g-p2.g) + (p1.b-p2.b)*(p1.b-p2.b);
 }
 
 void makeClusters(Image* img, int numOfClusters, int maxIter, SDL_Renderer* renderer, SDL_Texture* texture)
@@ -124,11 +133,14 @@ void makeClusters(Image* img, int numOfClusters, int maxIter, SDL_Renderer* rend
         {
             for (int y = 0; y < img->height; y++)
             {
+                Pixel p1 = img->pixels[x + img->width*y];                                
                 int i = -1, j = -1;
                 int min_dist = INT_MAX;
                 for (auto c : clusters)
                 {
-                    int dist = (c[0] - x)*(c[0] - x) + (c[1] - y)*(c[1] - y); 
+                    Pixel p2 = img->pixels[c[0] + img->width*c[1]];
+                    int dist = distanceBetweenTwoColors(p1, p2);
+                    
                     if (dist >= min_dist) continue;
                     min_dist = dist;
                     i = c[0];
@@ -137,7 +149,6 @@ void makeClusters(Image* img, int numOfClusters, int maxIter, SDL_Renderer* rend
                 map[{i,j}].push_back({x, y});
             }
         }
-        //TODO: Calculate the CENTER OF GRAVITY to move clusters
         int k = 0;
         for (auto cp : map)
         {
@@ -170,19 +181,19 @@ void makeClusters(Image* img, int numOfClusters, int maxIter, SDL_Renderer* rend
 
 int main()
 {
-    const char filePath[] = "dog.jpg";
+    const char filePath[] = "assets/fox.jpg";
     Image* img = loadImage(filePath);
     
     assert(SDL_Init(SDL_INIT_VIDEO) == 0);
     SDL_Window* window = SDL_CreateWindow( "", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, img->width, img->height, SDL_WINDOW_SHOWN );
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, 0);
-    SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR32, SDL_TEXTUREACCESS_STREAMING, img->width, img->height);
+    SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, img->width, img->height);
     
     SDL_Event event;
     bool done = false;
     
-    int numOfClusters = 3000;
-    int numOfIterations = 20;
+    int numOfClusters = 100;
+    int numOfIterations = 10;
     while (SDL_PollEvent(&event) || !done)
     {
         switch (event.type)
@@ -205,6 +216,8 @@ int main()
     SDL_DestroyRenderer(renderer);
     SDL_DestroyTexture(texture);
     SDL_DestroyWindow(window);
+    
+    stbi_write_jpg("assets/fox_after.jpg", img->width, img->height, 4, img->pixels, img->pitch);
     
     delete[] img->pixels;
     delete img;

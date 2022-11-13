@@ -1,9 +1,2 @@
 */*.o
 bin/
-
-*.ppm
-*.png
-*.jpg
-
-!parrot.jpg
-!dog.jpg
