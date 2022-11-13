@@ -1,5 +1,14 @@
+#pragma GCC optimize("O3","unroll-loops","omit-frame-pointer","inline") //Optimization flags
+#pragma GCC option("arch=native","tune=native","no-zero-upper") //Enable AVX
+#pragma GCC target("avx")
+
+#include <x86intrin.h>
+
 #include <random>
 #include <iostream>
+
+#include <vector>
+#include <unordered_map>
 
 #include <cstdint>
 #include <stdio.h>
@@ -32,6 +41,34 @@ struct Image
     }
 };
 
+struct Point
+{
+    int x, y;
+    Point(int x, int y)
+    {
+        this->x = x;
+        this->y = y;
+    }
+    
+    bool operator==(const Point &p) const
+    {
+        return x == p.x && y == p.y;
+    }
+};
+
+namespace std {
+  template <>
+  struct hash<Point>
+  {
+    std::size_t operator()(const Point& p) const
+    {
+      using std::size_t;
+      using std::hash;
+      return (hash<int>()(p.x)^ (hash<int>()(p.y)));
+    }
+  };
+}
+
 Image* loadImage(const char* filePath)
 {
     Image* img = new Image;
@@ -45,7 +82,6 @@ Image* loadImage(const char* filePath)
         {
             int offset = (x*img->height + y) * img->comps;
             img->pixels[x*img->height + y] = (data[offset] << 24) + (data[offset + 1] << 16) + (data[offset + 2] << 8) + 0xFF;
-            
             //printf("[r: %x, g: %x, b: %x] => %x \n", data[offset], data[offset+1], data[offset+2], img->pixels[x * img->height + y]);
         } 
     }
@@ -67,7 +103,7 @@ void makeGray(Image* img, SDL_Renderer* renderer, SDL_Texture* texture)
     }   
 }
 
-void makeClusters(Image* img, int numOfClusters, SDL_Renderer* renderer, SDL_Texture* texture)
+void makeClusters(Image* img, int numOfClusters, int maxIter, SDL_Renderer* renderer, SDL_Texture* texture)
 {
     std::random_device dev;
     std::mt19937 rng(dev());
@@ -81,29 +117,60 @@ void makeClusters(Image* img, int numOfClusters, SDL_Renderer* renderer, SDL_Tex
         clusters[i][1] = h(rng);
     }
     
-    for (int x = 0; x < img->width; x++)
+    std::unordered_map<Point, std::vector<Point>> map;
+    for (int h = 0; h < maxIter; h++)
     {
-        for (int y = 0; y < img->height; y++)
+        for (int x = 0; x < img->width; x++)
         {
-            int i = -1, j = -1;
-            int min_dist = INT_MAX;
-            for (auto c : clusters)
+            for (int y = 0; y < img->height; y++)
             {
-                int dist = pow(c[0] - x, 2) + pow(c[1] - y, 2); 
-                if (dist >= min_dist) continue;
-                min_dist = dist;
-                i = c[0];
-                j = c[1]; 
+                int i = -1, j = -1;
+                int min_dist = INT_MAX;
+                for (auto c : clusters)
+                {
+                    int dist = pow(c[0] - x, 2) + pow(c[1] - y, 2); 
+                    if (dist >= min_dist) continue;
+                    min_dist = dist;
+                    i = c[0];
+                    j = c[1];
+                }
+                map[{i,j}].push_back({x, y});
             }
-            img->pixels[x*img->height + y] = img->pixels[i*img->height + j];
         }
-        img->updateTextureDisplay(renderer, texture);        
+        //TODO: Calculate the CENTER OF GRAVITY to move clusters
+        int k = 0;
+        for (auto cp : map)
+        {
+            int mx = -1, my = -1, n = 0;
+            for (auto p : cp.second)
+            {
+                mx += p.x;
+                my += p.y;
+                n++; 
+            }
+            clusters[k][0] = mx / n;
+            clusters[k][1] = my / n;
+            k++;
+        }
+        if (h < maxIter - 1) 
+        {
+            map.clear();
+        }
+    }
+    
+    for (auto cp : map)
+    {
+        for (auto p : cp.second)
+        {
+            img->pixels[p.x*img->height + p.y] = img->pixels[cp.first.x*img->height + cp.first.y];
+        }
+        img->updateTextureDisplay(renderer, texture);                
     }
 }
 
 int main()
 {
-    const char filePath[] = "duck.jpg";
+    const char filePath[] = "parrot.jpg";
     Image* img = loadImage(filePath);
     
     assert(SDL_Init(SDL_INIT_VIDEO) == 0);
@@ -114,7 +181,8 @@ int main()
     SDL_Event event;
     bool done = false;
     
-    int numOfClusters = 1000;
+    int numOfClusters = 3000;
+    int numOfIterations = 30;
     while (SDL_PollEvent(&event) || !done)
     {
         switch (event.type)
@@ -125,7 +193,7 @@ int main()
                 if (event.key.keysym.sym == SDLK_g)
                     makeGray(img, renderer, texture);
                 if (event.key.keysym.sym == SDLK_s)
-                    makeClusters(img, numOfClusters, renderer, texture);
+                    makeClusters(img, numOfClusters, numOfIterations, renderer, texture);
             break;                
             case SDL_QUIT:
                 done = true;
