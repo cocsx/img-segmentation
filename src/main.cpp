@@ -27,7 +27,7 @@
 #include "../vendor/stb/stb_image_write.h"
 
 struct __attribute__ ((packed)) Pixel {
-    uint8_t r, g, b, a;
+    uint8_t r, g, b;
 };
 
 struct Image 
@@ -85,7 +85,7 @@ Image* loadImage(const char* filePath)
         for (int y = 0; y < img->height; y++)
         {
             int offset = (x + img->width*y) * img->comps;
-            img->pixels[x + img->width*y] = {data[offset], data[offset+1], data[offset+2], 0xff};
+            img->pixels[x + img->width*y] = {data[offset], data[offset+1], data[offset+2]};
             //printf("[r: %x, g: %x, b: %x] => %x \n", data[offset], data[offset+1], data[offset+2], img->pixels[x * img->height + y]);
         } 
     }
@@ -101,7 +101,7 @@ void makeGray(Image* img, SDL_Renderer* renderer, SDL_Texture* texture)
         {
             Pixel p = img->pixels[x + img->width*y];
             uint8_t g = (p.r + p.g + p.b) / 3;
-            img->pixels[x + img->width*y] = {g, g, g, 0xff};
+            img->pixels[x + img->width*y] = {g, g, g};
         }
         img->updateTextureDisplay(renderer, texture);
     }   
@@ -187,13 +187,13 @@ int main()
     assert(SDL_Init(SDL_INIT_VIDEO) == 0);
     SDL_Window* window = SDL_CreateWindow( "", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, img->width, img->height, SDL_WINDOW_SHOWN );
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, 0);
-    SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, img->width, img->height);
+    SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, img->width, img->height);
     
     SDL_Event event;
     bool done = false;
     
-    int numOfClusters = 100;
-    int numOfIterations = 10;
+    int numOfClusters = 10;
+    int numOfIterations = 50;
     while (SDL_PollEvent(&event) || !done)
     {
         switch (event.type)
@@ -217,7 +217,7 @@ int main()
     SDL_DestroyTexture(texture);
     SDL_DestroyWindow(window);
     
-    stbi_write_jpg("assets/fox_after.jpg", img->width, img->height, 4, img->pixels, img->pitch);
+    stbi_write_jpg("assets/fox_after.jpg", img->width, img->height, 3, img->pixels, 0);
     
     delete[] img->pixels;
     delete img;
