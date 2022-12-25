@@ -1,7 +1,7 @@
 CC = g++
-CFLAGS = -c -Wall -g -O3 -fopt-info-vec-all
+CFLAGS = -c -Wall -pthread -g -std=c++17 -O3 -fopt-info-vec-all
 LD = $(CC)
-LDFLAGS = -lSDL2 
+LDFLAGS = -ltbb -lSDL2
 
 TARGET = ./bin/kmeans
 

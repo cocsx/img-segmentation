@@ -1,7 +1,8 @@
 #pragma once
 
-#define STB_IMAGE_IMPLEMENTATION
 #include "../vendor/stb/stb_image.h"
+
+#include <cstdint>
 
 struct __attribute__ ((packed)) Pixel {
 	uint8_t r, g, b;
@@ -52,3 +53,4 @@ struct Image
 		delete[] m_pixels;
 	}
 };
+
