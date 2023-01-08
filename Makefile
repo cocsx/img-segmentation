@@ -1,5 +1,5 @@
 CC = g++
-CFLAGS = -c -Wall -pthread -g -std=c++17 -O3 -fopt-info-vec-all
+CFLAGS = -c -Wall -g -std=c++17 -O3 -fopt-info-vec-all
 LD = $(CC)
 LDFLAGS = -ltbb -lSDL2
 
